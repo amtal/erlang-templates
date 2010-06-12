@@ -1,10 +1,22 @@
+SUMMARY:
+
 The Erlang Open Telecom Platform (OTP) is a set of libraries and practices for building robust services. It relies on 'behaviors', callback modules implementing common patterns like state machines, servers, event handlers, and others.
 
-This is a powerful tool with many benefits, but involves some boilerplate code when you start a new module. This 
+This is a powerful tool with many benefits, but involves some boilerplate code when you start a new module. These templates solve that problem.
 
+GUIDELINES:
+
+Export wrapper functions for messages, to ensure a clean interface. Example:
+    add_user(Uid) -> 
+        gen_fsm:send_event(?MODULE, {add, Foo}).
+    kick_user(Uid) ->
+        gen_fsm:send_event(Uid, kick).
+
+Use edoc tags (@doc and @spec mostly) in your comments, it's trivial to do and produces great-looking docs. (See: erl -man edoc, or man 3 edoc.) The @spec tag in particular is crucial, to avoid dynamic typing mismatch screwups!
 
 TODO:
-    cover the major stuff, gen_fsm, gen_server, gen_event, supervisor, app, etc
-    link useful docs from README (OTP, Erlang, tutorials on designing/making OTP supervision trees, and edoc?)
+
+cover the major stuff, gen_fsm, gen_server, gen_event, supervisor, app, etc
+link useful docs from README (OTP, Erlang, tutorials on designing/making OTP supervision trees, and edoc?)
     ensure everything necessary is present
-        edoc support, comments, consistency
+        edoc support, comments, consistency, vsn tag

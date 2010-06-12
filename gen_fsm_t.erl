@@ -1,6 +1,6 @@
-%%% @doc One sentence blurb.
+%%% @doc One line blurb.
 %%%
-%%% More detailed description.
+%%% More detailed, multi-line description.
 %%%
 %%% @author JSmith <john.smith@gmail.com>
 -module(gen_fsm_t).
