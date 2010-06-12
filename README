@@ -1,0 +1,10 @@
+The Erlang Open Telecom Platform (OTP) is a set of libraries and practices for building robust services. It relies on 'behaviors', callback modules implementing common patterns like state machines, servers, event handlers, and others.
+
+This is a powerful tool with many benefits, but involves some boilerplate code when you start a new module. This 
+
+
+TODO:
+    cover the major stuff, gen_fsm, gen_server, gen_event, supervisor, app, etc
+    link useful docs from README (OTP, Erlang, tutorials on designing/making OTP supervision trees, and edoc?)
+    ensure everything necessary is present
+        edoc support, comments, consistency
