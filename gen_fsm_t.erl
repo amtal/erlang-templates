@@ -1,7 +1,6 @@
 %%% @doc One line blurb.
 %%%
 %%% More detailed, multi-line description.
-%%%
 %%% @author JSmith <john.smith@gmail.com>
 -module(gen_fsm_t).
 -export([start/1, start_link/1]).
@@ -13,32 +12,41 @@
 
 
 %% @doc 
-%% @spec term()->{ok,pid()} | ignore | {error,term()}
+%% @spec (term())->{ok,pid()} | ignore | {error,term()}
 start(Args) -> gen_fsm:start(?MODULE, Args, []).
-%% @spec term()->{ok,pid()} | ignore | {error,term()}
+%% @doc See: {@link start/1}
+%% @spec (term())->{ok,pid()} | ignore | {error,term()}
 start_link(Args) -> gen_fsm:start_link(?MODULE, Args, []).
 
 
+%% @hidden
 init(_Args) ->
     {ok, first_state, state_data}.
 
+%% @hidden
 first_state(_Event, StateData) ->
     {stop, unimplemented, StateData}.
 
+%% @hidden
 first_state(_Event, _From, StateData) ->
     {stop, unimplemented, StateData}.
 
+%% @hidden
 handle_event(_Event, _StateName, StateData) ->
     {stop, unimplemented, StateData}.
 
+%% @hidden
 handle_sync_event(_Event, _From, _StateName, StateData) ->
     {stop, unimplemented, StateData}.
 
+%% @hidden
 handle_info(_Info, _StateName, StateData) ->
     {stop, unimplemented, StateData}.
 
+%% @hidden
 terminate(_Reason, _StateName, _StateData) ->
     ok.
 
+%% @hidden
 code_change(_OldVsn, StateName, StateData, _Extra) ->
     {ok, StateName, StateData}.
