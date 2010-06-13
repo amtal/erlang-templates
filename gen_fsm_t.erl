@@ -19,34 +19,34 @@ start(Args) -> gen_fsm:start(?MODULE, Args, []).
 start_link(Args) -> gen_fsm:start_link(?MODULE, Args, []).
 
 
-%% @hidden
+%% @hidden gen_fsm
 init(_Args) ->
     {ok, first_state, state_data}.
 
-%% @hidden
+%% @hidden gen_fsm
 first_state(_Event, StateData) ->
     {stop, unimplemented, StateData}.
 
-%% @hidden
+%% @hidden gen_fsm
 first_state(_Event, _From, StateData) ->
     {stop, unimplemented, StateData}.
 
-%% @hidden
+%% @hidden gen_fsm
 handle_event(_Event, _StateName, StateData) ->
     {stop, unimplemented, StateData}.
 
-%% @hidden
+%% @hidden gen_fsm
 handle_sync_event(_Event, _From, _StateName, StateData) ->
     {stop, unimplemented, StateData}.
 
-%% @hidden
+%% @hidden gen_fsm
 handle_info(_Info, _StateName, StateData) ->
     {stop, unimplemented, StateData}.
 
-%% @hidden
+%% @hidden gen_fsm
 terminate(_Reason, _StateName, _StateData) ->
     ok.
 
-%% @hidden
+%% @hidden gen_fsm
 code_change(_OldVsn, StateName, StateData, _Extra) ->
     {ok, StateName, StateData}.
