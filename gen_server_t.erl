@@ -4,13 +4,14 @@
 %%% @author JSmith <john.smith@gmail.com>
 -module(gen_server_t).
 -export([start/1, start_link/1]).
+
 -behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/3, code_change/4]).
+         terminate/2, code_change/3]).
 -vsn(0).
 
--record(state, ( field  %
-               )).
+-record(s, { field  %
+           }).
 
 %% @doc 
 %% @spec (term())->{ok,pid()} | ignore | {error,term()}
@@ -22,7 +23,7 @@ start_link(Args) -> gen_fsm:start_link(?MODULE, Args, []).
 
 %% @hidden gen_server
 init(_Args) ->
-    State = #state{
+    State = #s{
         field = undefined
     },
     {ok, State}.
@@ -40,7 +41,7 @@ handle_info(_Info, State) ->
     {stop, unimplemented, State}.
 
 %% @hidden gen_server
-terminate(_Reason, State) ->
+terminate(_Reason, _State) ->
     ok.
 
 %% @hidden gen_server
