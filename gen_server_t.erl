@@ -15,10 +15,10 @@
 
 %% @doc 
 %% @spec (term())->{ok,pid()} | ignore | {error,term()}
-start(Args) -> gen_fsm:start(?MODULE, Args, []).
+start(Args) -> gen_server:start(?MODULE, Args, []).
 %% @doc See: {@link start/1}
 %% @spec (term())->{ok,pid()} | ignore | {error,term()}
-start_link(Args) -> gen_fsm:start_link(?MODULE, Args, []).
+start_link(Args) -> gen_server:start_link(?MODULE, Args, []).
 
 
 %% @hidden gen_server
