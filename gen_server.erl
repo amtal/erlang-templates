@@ -2,7 +2,7 @@
 %%%
 %%% More detailed, multi-line description.
 %%% @author JSmith <john.smith@gmail.com>
--module(gen_server_t).
+-module(gen_server).
 -export([start/1, start_link/1]).
 
 -behaviour(gen_server).

@@ -2,7 +2,7 @@
 %%%
 %%% More detailed, multi-line description.
 %%% @author JSmith <john.smith@gmail.com>
--module(gen_fsm_t).
+-module(gen_fsm).
 -export([start/1, start_link/1]).
 -behaviour(gen_fsm).
 -export([init/1, handle_event/3, handle_sync_event/4, handle_info/3,
