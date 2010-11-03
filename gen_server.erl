@@ -23,27 +23,27 @@ start_link(Args) -> gen_server:start_link(?MODULE, Args, []).
 
 %% @hidden gen_server
 init(_Args) ->
-    State = #s{
+    St = #s{
         field = undefined
     },
-    {ok, State}.
+    {ok, St}.
 
 %% @hidden gen_server
-handle_call(_Request, _From, State) ->
-    {stop, unimplemented, State}.
+handle_call(_Request, _From, St) ->
+    {stop, unimplemented, St}.
 
 %% @hidden gen_server
-handle_cast(_Request, State) ->
-    {stop, unimplemented, State}.
+handle_cast(_Request, St) ->
+    {stop, unimplemented, St}.
 
 %% @hidden gen_server
-handle_info(_Info, State) ->
-    {stop, unimplemented, State}.
+handle_info(_Info, St) ->
+    {stop, unimplemented, St}.
 
 %% @hidden gen_server
-terminate(_Reason, _State) ->
+terminate(_Reason, _St) ->
     ok.
 
 %% @hidden gen_server
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
+code_change(_OldVsn, St, _Extra) ->
+    {ok, St}.

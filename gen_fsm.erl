@@ -24,29 +24,29 @@ init(_Args) ->
     {ok, first_state, state_data}.
 
 %% @hidden gen_fsm
-first_state(_Event, StateData) ->
-    {stop, unimplemented, StateData}.
+first_state(_Event, StData) ->
+    {stop, unimplemented, StData}.
 
 %% @hidden gen_fsm
-first_state(_Event, _From, StateData) ->
-    {stop, unimplemented, StateData}.
+first_state(_Event, _From, StData) ->
+    {stop, unimplemented, StData}.
 
 %% @hidden gen_fsm
-handle_event(_Event, _StateName, StateData) ->
-    {stop, unimplemented, StateData}.
+handle_event(_Event, _StName, StData) ->
+    {stop, unimplemented, StData}.
 
 %% @hidden gen_fsm
-handle_sync_event(_Event, _From, _StateName, StateData) ->
-    {stop, unimplemented, StateData}.
+handle_sync_event(_Event, _From, _StName, StData) ->
+    {stop, unimplemented, StData}.
 
 %% @hidden gen_fsm
-handle_info(_Info, _StateName, StateData) ->
-    {stop, unimplemented, StateData}.
+handle_info(_Info, _StName, StData) ->
+    {stop, unimplemented, StData}.
 
 %% @hidden gen_fsm
-terminate(_Reason, _StateName, _StateData) ->
+terminate(_Reason, _StName, _StData) ->
     ok.
 
 %% @hidden gen_fsm
-code_change(_OldVsn, StateName, StateData, _Extra) ->
-    {ok, StateName, StateData}.
+code_change(_OldVsn, StName, StData, _Extra) ->
+    {ok, StName, StData}.
