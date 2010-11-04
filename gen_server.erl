@@ -15,10 +15,10 @@
     }).
 
 %% @doc 
--spec start(any())->{ok,pid()} | ignore | {error,any()}
+-spec start(any())->{ok,pid()} | ignore | {error,any()}.
 start(Args) -> gen_server:start(?MODULE, Args, []).
 %% @doc See: {@link start/1}
--spec start_link(any())->{ok,pid()} | ignore | {error,any()}
+-spec start_link(any())->{ok,pid()} | ignore | {error,any()}.
 start_link(Args) -> gen_server:start_link(?MODULE, Args, []).
 
 
