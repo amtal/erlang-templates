@@ -10,20 +10,21 @@
          terminate/2, code_change/3]).
 -vsn(0).
 
--record(s, { field  %
-           }).
+-record(ate, 
+    { field = undefined :: any() %
+    }).
 
 %% @doc 
-%% @spec (term())->{ok,pid()} | ignore | {error,term()}
+-spec start(any())->{ok,pid()} | ignore | {error,any()}
 start(Args) -> gen_server:start(?MODULE, Args, []).
 %% @doc See: {@link start/1}
-%% @spec (term())->{ok,pid()} | ignore | {error,term()}
+-spec start_link(any())->{ok,pid()} | ignore | {error,any()}
 start_link(Args) -> gen_server:start_link(?MODULE, Args, []).
 
 
 %% @hidden gen_server
 init(_Args) ->
-    St = #s{
+    St = #ate{
         field = undefined
     },
     {ok, St}.
