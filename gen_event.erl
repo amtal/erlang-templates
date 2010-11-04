@@ -5,17 +5,18 @@
 -module(gen_event).
 
 -behaviour(gen_event).
--export([init/1, handle_event/2, handle_call/3, handle_info/2, terminate/2,
+-export([init/1, handle_event/2, handle_call/2, handle_info/2, terminate/2,
          code_change/3]).
 -vsn(0).
 
--record(s, { field = undefined %
-           }).
+-record(ate, 
+    { field = undefined :: any() %
+    }).
 
 
 %% @hidden gen_event
 init(_Args) ->
-    St = #s{
+    St = #ate{
     },
     {ok, St}.
 
@@ -25,7 +26,7 @@ handle_event(_Event, St) ->
 
 %% @hidden gen_event
 handle_call(_Request, St) ->
-    {ok,unimplemented,St).
+    {ok,unimplemented,St}.
 
 %% @hidden gen_event
 handle_info(_Info, St) ->
