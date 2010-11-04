@@ -10,12 +10,12 @@
 
 
 %% @doc Short description.
-%% @spec (term())->{ok,Pid}|ignore|{error,Reason}
-init(Args) ->
+-spec start_link(term())->{ok,pid()}|ignore|{error,any()}.
+start_link(Args) ->
     supervisor:start_link(?MODULE, Args).
 
 %% @hidden supervisor
-init(Args) ->
+init(_Args) ->
     Restart = {one_for_one, 2, 5},
     C0 = { arbitrary_internal_name_term
          , {mod,func,args}
@@ -24,4 +24,4 @@ init(Args) ->
          , worker
          , [mod]
          },
-    {ok,{Restart,[C0]}
+    {ok,{Restart,[C0]}}.
