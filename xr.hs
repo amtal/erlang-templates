@@ -175,8 +175,10 @@ mkGraph ms = concat . intersperse "\n"
         external = filter (not . flip elem internal) called
         called = filter bad 
                . concat 
-               . map (map (\(Call _ to _ _)->to).snd) 
+               . map (map getTarg . snd) 
                $ ms
+        getTarg (Call _ to _ _) = to
+        getTarg _ = "TODO"
         bad "-" = False -- I don't understand how this happens
         bad _ = True -- nor care enough to figure it out now
         edge ss shp = concat . map ppMod $ ss where
