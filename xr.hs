@@ -139,7 +139,15 @@ extractCrossRefs tree = walkM (stripA tree) where
         get (Exp(Constr(Lit(LAtom(Atom m))))) 
             (Exp(Constr(Lit(LAtom(Atom f))))) 
             a = Call Static m f a
-        -- TODO: handle non-static calls
+        get (Exp(Constr(Var m)))
+            (Exp(Constr(Lit(LAtom(Atom f))))) 
+            a = Call DynMod m f a
+        get (Exp(Constr(Lit(LAtom(Atom m))))) 
+            (Exp(Constr(Var f)))
+            a = Call DynFun m f a
+        get (Exp(Constr(Var m)))
+            (Exp(Constr(Var f)))
+            a = Call DynAll m f a
         get foo bar arity = Unimplemented (show (foo,bar,arity))
     -- everything else can't contain side effects, and can be ignored
     -- (probably)
@@ -178,16 +186,24 @@ mkGraph ms = concat . intersperse "\n"
                . map (map getTarg . snd) 
                $ ms
         getTarg (Call _ to _ _) = to
-        getTarg _ = "TODO"
+        getTarg _ = "this edge case should no longer occur"
         bad "-" = False -- I don't understand how this happens
         bad _ = True -- nor care enough to figure it out now
         edge ss shp = concat . map ppMod $ ss where
-            ppMod s = ["\t"++s++" [shape="++shp++"]"]
+            ppMod s = ["\t"++esc s++" [shape="++shp++"]"]
     -- call edges
     calls :: [String]
     calls = concat . map ppModCalls $ ms 
     ppModCalls (mName,mCalls) = map ppCall mCalls where
-        ppCall (Call Static m _f _a)
-            | m `elem` ignoredModules = "/* ignored call to "++m++" */"
-            | otherwise = mName++"->"++m
-        ppCall (Unimplemented err) = "/* unhandled call: "++err++" */"
+        ppCall (Call DynFun m _f _a)
+            | m `elem` ignoredModules = comm "ignored call to" m
+            | otherwise = arr mName m++" [arrowhead=dot]"
+        ppCall (Call DynAll m _f _a) = arr mName m++" [arrowhead=dot]"
+        ppCall (Call _ m _f _a)
+            | m `elem` ignoredModules = comm "ignored call to" m
+            | otherwise = arr mName m
+        ppCall (Unimplemented err) = comm "unhandled call" err
+        arr m m' = esc m++"->"++esc m'
+        comm s m = "/* "++s++" "++m++" */"
+    -- utility
+    esc s = '\"':s++"\""
