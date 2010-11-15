@@ -25,9 +25,16 @@
 --
 -- TODO:
 --
--- handle dynamic module/fun/both calls correctly
 -- pure ignore list as a runtime option, rather than hardcode
+-- modify ignoring *test.erl via cmd line switch
+-- compress multiple call lines into just one, but with a number label
+-- compress multiple calls from same function into one with label?
+--      (this could be interesting for refactoring between files)
+-- 
 -- something to avoid constant recompile cost...
+-- graph colouring to trace flow through multiple modules?
+-- have a "focus" mode that displays major neighbors of node only
+--      (to conform to 7+/-2... could auto-grouping also do this?)
 --
 -- watch HRL file dependencies (and that's a regex thing)
 -- detect bad record sharing? ...looks like that'd be a whole separate
