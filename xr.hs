@@ -1,4 +1,5 @@
-#!/usr/bin/runghc
+-- #!/usr/bin/runghc 
+-- (uncomment to make file executable)
 --
 -- "X-module function Reference grapher"
 --
