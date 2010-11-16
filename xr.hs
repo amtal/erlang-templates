@@ -32,8 +32,6 @@
 -- modify ignoring *test.erl via cmd line switch
 -- have option to not delete .core files (debug)
 -- compress multiple call lines into just one, but with a number label
--- compress multiple calls from same function into one with label?
---      (this could be interesting for refactoring between files)
 -- 
 -- something to avoid constant recompile cost...
 -- graph colouring to trace flow through multiple modules?
