@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 -- #!/usr/bin/runghc 
 -- (uncomment to make file executable)
 --
@@ -145,7 +146,7 @@ test = do
 
 -- collect extramodular calls
 collect :: Exp -> [Call]
-collect e@(ModCall (m,f) args) = collect `cmap` exp e
+collect e@(ModCall (m,f) args) = collect `cmap` climb e
                               ++ [get m f (length args)] where
     get (Exp(Constr(Lit(LAtom(Atom m))))) 
         (Exp(Constr(Lit(LAtom(Atom f))))) 
@@ -160,44 +161,47 @@ collect e@(ModCall (m,f) args) = collect `cmap` exp e
         (Exp(Constr(Var f)))
         a = Call DynAll m f a
     get foo bar arity = Unimplemented (show (foo,bar,arity))
-collect e = collect `cmap` exp e
-
--- Generalized tree climbing:
+collect e = collect `cmap` climb e
 
 funDef :: FunDef -> Exp
 funDef (FunDef _ a) = stripA a
+
+
+-- Generalized syntax tree climbing
+class Tree a where climb :: a -> [Exp]
 -- Exp forms the bulk of the AST, recursively referring to
--- itself via Exps (which are just annoted Exp)
-exp :: Exp -> [Exp]
-exp (App ex exs) = exps ex ++ cmap exps exs
-exp (Lambda _ ex) = exps ex
-exp (Seq ex ex') = exps ex ++ exps ex'
-exp (Let (_,ex) ex') = exps ex ++ exps ex'
-exp (LetRec fs ex) = map funDef fs ++ exps ex
-exp (Case ex as) = exps ex ++ cmap (alt . stripA) as
-exp (Rec as _) = cmap (alt . stripA) as
-exp (Tuple exs) = cmap exps exs
-exp (List l) = expL l where
-    expL (L es) = cmap exps es
-    expL (LL es e) = exps e ++ cmap exps es
-exp (Binary bs) = cmap expB bs where
-    expB (BitString _ es) = cmap exps es
-exp (ModCall (_,_) args) = cmap exps args 
-exp (Op _ es) = cmap exps es
-exp (Try es (_, es') (_, es'')) = cmap exps (es:es':es'':[])
-exp (Catch es) = exps es
--- everything else can't contain side effects, and can be ignored
--- (probably)
-exp _ = []
--- annotated groupings of Exp
-exps :: Exps -> [Exp]
-exps (Exp a) = [stripA a]
-exps (Exps as) = stripA `map` stripA as
--- alternatives in case/receive
--- fairly sure these are guards with no side effects, and thus
--- aren't worth exping...
-alt :: Alt -> [Exp]
-alt (Alt _ _ ex) = exps ex
+-- itself via Exps (which are just one or more annotated Exp)
+instance Tree Exps where
+    climb (Exp a) = [stripA a]
+    climb (Exps as) = stripA `map` stripA as
+instance Tree Exp where
+    climb (App ex exs) = climb ex ++ cmap climb exs
+    climb (Lambda _ ex) = climb ex
+    climb (Seq ex ex') = climb ex ++ climb ex'
+    climb (Let (_,ex) ex') = climb ex ++ climb ex'
+    climb (LetRec fs ex) = map funDef fs ++ climb ex
+    climb (Case ex as) = climb ex ++ cmap (climb . stripA) as
+    climb (Rec as _) = cmap (climb . stripA) as
+    climb (Tuple exs) = cmap climb exs
+    climb (List l) = climb l where
+    climb (Binary bs) = cmap climb bs where
+    climb (ModCall (_,_) args) = cmap climb args 
+    climb (Op _ es) = cmap climb es
+    climb (Try es (_, es') (_, es'')) = cmap climb (es:es':es'':[])
+    climb (Catch es) = climb es
+    -- everything else can't contain side effects, and can be
+    -- ignored (probably, surely I got it all)
+    climb _ = []
+-- some of the following probably deserve a 'where' not an instance...
+instance Tree Alt where
+    climb (Alt _ guard ex) = climb guard ++ climb ex
+instance Tree Guard where -- should be pure, but may as well...
+    climb (Guard exs) = climb exs
+instance Tree (List Exps) where
+    climb (L es) = cmap climb es -- no guarantees on order...
+    climb (LL es e) = climb e ++ cmap climb es
+instance Tree (BitString Exps) where
+    climb (BitString _ es) = cmap climb es
 
 
 
