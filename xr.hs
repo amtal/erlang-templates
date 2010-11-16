@@ -121,39 +121,39 @@ process fname = do
             
             return [extractCrossRefs tree]
 
--- recursively walk tree via pattern matching, looking for
+-- recursively exp tree via pattern matching, looking for
 -- ModCalls (todo: generalize this via something like a Functor)
 extractCrossRefs :: Ann Module -> (String,[Call])
-extractCrossRefs tree = walkM (stripA tree) where
+extractCrossRefs tree = mod (stripA tree) where
     -- annotations show up everywhere and we don't care
     -- (what are they even for, -spec stuff?)
     stripA (Ann m _) = m
     stripA (Constr m) = m
     -- root of AST
-    walkM (Module (Atom name) _ _ funs) = (name,calls) where 
-        calls = concatMap walkFD funs
-    walkFD (FunDef _ a) = walk (stripA a)
-    --walk :: Exp -> [a]
+    mod (Module (Atom name) _ _ funs) = (name,calls) where 
+        calls = concatMap funDef funs
+    funDef (FunDef _ a) = exp (stripA a)
+    --exp :: Exp -> [a]
     -- Exp forms the bulk of the AST, recursively referring to itself
     -- via Exps (which are just annoted Exp?)
-    walk (App ex exs) = walkE ex ++ concatMap walkE exs
-    walk (Lambda _ ex) = walkE ex
-    walk (Seq ex ex') = walkE ex ++ walkE ex'
-    walk (Let (_,ex) ex') = walkE ex ++ walkE ex'
-    walk (LetRec fs ex) = concatMap walkFD fs ++ walkE ex
-    walk (Case ex as) = walkE ex ++ concatMap (walkAlt . stripA) as
-    walk (Rec as _) = concatMap (walkAlt . stripA) as
-    walk (Tuple exs) = concatMap walkE exs
-    walk (List l) = walkL l where
-        walkL (L es) = concatMap walkE es
-        walkL (LL es e) = walkE e ++ concatMap walkE es
-    walk (Binary bs) = concatMap walkB bs where
-        walkB (BitString _ es) = concatMap walkE es
-    walk (Op _ es) = concatMap walkE es
-    walk (Try es (_, es') (_, es'')) = concatMap walkE (es:es':es'':[])
-    walk (Catch es) = walkE es
+    exp (App ex exs) = exps ex ++ concatMap exps exs
+    exp (Lambda _ ex) = exps ex
+    exp (Seq ex ex') = exps ex ++ exps ex'
+    exp (Let (_,ex) ex') = exps ex ++ exps ex'
+    exp (LetRec fs ex) = concatMap funDef fs ++ exps ex
+    exp (Case ex as) = exps ex ++ concatMap (alt . stripA) as
+    exp (Rec as _) = concatMap (alt . stripA) as
+    exp (Tuple exs) = concatMap exps exs
+    exp (List l) = expL l where
+        expL (L es) = concatMap exps es
+        expL (LL es e) = exps e ++ concatMap exps es
+    exp (Binary bs) = concatMap expB bs where
+        expB (BitString _ es) = concatMap exps es
+    exp (Op _ es) = concatMap exps es
+    exp (Try es (_, es') (_, es'')) = concatMap exps (es:es':es'':[])
+    exp (Catch es) = exps es
     -- collect extramodular calls
-    walk (ModCall (m,f) args) = concatMap walkE args 
+    exp (ModCall (m,f) args) = concatMap exps args 
                              ++ [(get m f (length args))] where
         get (Exp(Constr(Lit(LAtom(Atom m))))) 
             (Exp(Constr(Lit(LAtom(Atom f))))) 
@@ -170,14 +170,16 @@ extractCrossRefs tree = walkM (stripA tree) where
         get foo bar arity = Unimplemented (show (foo,bar,arity))
     -- everything else can't contain side effects, and can be ignored
     -- (probably)
-    walk _ = []
-    --walkE :: Exps -> [a]
-    walkE (Exp a) = walk (stripA a)
-    walkE (Exps as) = concatMap (\a->walk .stripA $ a) $ stripA as
-    --walkAlt :: Alt -> [a]
+    exp _ = []
+    --exps :: Exps -> [a]
+    exps (Exp a) = exp (stripA a)
+    exps (Exps as) = concatMap (\a->exp .stripA $ a) $ stripA as
+    --ann :: Alt -> [a]
     -- fairly sure guards have no side effects, and thus aren't
-    -- worth walking...
-    walkAlt (Alt _ _ ex) = walkE ex
+    -- worth exping...
+    alt (Alt _ _ ex) = exps ex
+
+
 
 -- * GraphViz Generation 
 --
