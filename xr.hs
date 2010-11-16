@@ -58,6 +58,7 @@ import System.Exit (ExitCode(..))
 -- Parsing and Filtering
 import Language.CoreErlang.Parser
 import Language.CoreErlang.Syntax
+import Prelude hiding (exp)
 -- GraphViz Generation
 import Data.List hiding (find)
 
@@ -125,59 +126,78 @@ process fname = do
 -- ModCalls (todo: generalize this via something like a Functor)
 extractCrossRefs :: Ann Module -> (String,[Call])
 extractCrossRefs tree = mod (stripA tree) where
-    -- annotations show up everywhere and we don't care
-    -- (what are they even for, -spec stuff?)
-    stripA (Ann m _) = m
-    stripA (Constr m) = m
-    -- root of AST
     mod (Module (Atom name) _ _ funs) = (name,calls) where 
-        calls = concatMap funDef funs
-    funDef (FunDef _ a) = exp (stripA a)
-    --exp :: Exp -> [a]
-    -- Exp forms the bulk of the AST, recursively referring to itself
-    -- via Exps (which are just annoted Exp?)
-    exp (App ex exs) = exps ex ++ concatMap exps exs
-    exp (Lambda _ ex) = exps ex
-    exp (Seq ex ex') = exps ex ++ exps ex'
-    exp (Let (_,ex) ex') = exps ex ++ exps ex'
-    exp (LetRec fs ex) = concatMap funDef fs ++ exps ex
-    exp (Case ex as) = exps ex ++ concatMap (alt . stripA) as
-    exp (Rec as _) = concatMap (alt . stripA) as
-    exp (Tuple exs) = concatMap exps exs
-    exp (List l) = expL l where
-        expL (L es) = concatMap exps es
-        expL (LL es e) = exps e ++ concatMap exps es
-    exp (Binary bs) = concatMap expB bs where
-        expB (BitString _ es) = concatMap exps es
-    exp (Op _ es) = concatMap exps es
-    exp (Try es (_, es') (_, es'')) = concatMap exps (es:es':es'':[])
-    exp (Catch es) = exps es
-    -- collect extramodular calls
-    exp (ModCall (m,f) args) = concatMap exps args 
-                             ++ [(get m f (length args))] where
-        get (Exp(Constr(Lit(LAtom(Atom m))))) 
-            (Exp(Constr(Lit(LAtom(Atom f))))) 
-            a = Call Static m f a
-        get (Exp(Constr(Var m)))
-            (Exp(Constr(Lit(LAtom(Atom f))))) 
-            a = Call DynMod m f a
-        get (Exp(Constr(Lit(LAtom(Atom m))))) 
-            (Exp(Constr(Var f)))
-            a = Call DynFun m f a
-        get (Exp(Constr(Var m)))
-            (Exp(Constr(Var f)))
-            a = Call DynAll m f a
-        get foo bar arity = Unimplemented (show (foo,bar,arity))
-    -- everything else can't contain side effects, and can be ignored
-    -- (probably)
-    exp _ = []
-    --exps :: Exps -> [a]
-    exps (Exp a) = exp (stripA a)
-    exps (Exps as) = concatMap (\a->exp .stripA $ a) $ stripA as
-    --ann :: Alt -> [a]
-    -- fairly sure guards have no side effects, and thus aren't
-    -- worth exping...
-    alt (Alt _ _ ex) = exps ex
+        calls = collect `cmap` map funDef funs
+
+-- annotations show up everywhere and we don't care
+-- (what are they even for, comments? line #s?)
+stripA :: Ann a -> a
+stripA (Ann m _) = m
+stripA (Constr m) = m
+
+cmap = concatMap
+
+test = do
+    f <- readFile "gen_server.core"
+    let (Right m) = parseModule f
+        (Module _ _ _ fs) = stripA m
+    return fs
+
+-- collect extramodular calls
+collect :: Exp -> [Call]
+collect e@(ModCall (m,f) args) = collect `cmap` exp e
+                              ++ [get m f (length args)] where
+    get (Exp(Constr(Lit(LAtom(Atom m))))) 
+        (Exp(Constr(Lit(LAtom(Atom f))))) 
+        a = Call Static m f a
+    get (Exp(Constr(Var m)))
+        (Exp(Constr(Lit(LAtom(Atom f))))) 
+        a = Call DynMod m f a
+    get (Exp(Constr(Lit(LAtom(Atom m))))) 
+        (Exp(Constr(Var f)))
+        a = Call DynFun m f a
+    get (Exp(Constr(Var m)))
+        (Exp(Constr(Var f)))
+        a = Call DynAll m f a
+    get foo bar arity = Unimplemented (show (foo,bar,arity))
+collect e = collect `cmap` exp e
+
+-- Generalized tree climbing:
+
+funDef :: FunDef -> Exp
+funDef (FunDef _ a) = stripA a
+-- Exp forms the bulk of the AST, recursively referring to
+-- itself via Exps (which are just annoted Exp)
+exp :: Exp -> [Exp]
+exp (App ex exs) = exps ex ++ cmap exps exs
+exp (Lambda _ ex) = exps ex
+exp (Seq ex ex') = exps ex ++ exps ex'
+exp (Let (_,ex) ex') = exps ex ++ exps ex'
+exp (LetRec fs ex) = map funDef fs ++ exps ex
+exp (Case ex as) = exps ex ++ cmap (alt . stripA) as
+exp (Rec as _) = cmap (alt . stripA) as
+exp (Tuple exs) = cmap exps exs
+exp (List l) = expL l where
+    expL (L es) = cmap exps es
+    expL (LL es e) = exps e ++ cmap exps es
+exp (Binary bs) = cmap expB bs where
+    expB (BitString _ es) = cmap exps es
+exp (ModCall (_,_) args) = cmap exps args 
+exp (Op _ es) = cmap exps es
+exp (Try es (_, es') (_, es'')) = cmap exps (es:es':es'':[])
+exp (Catch es) = exps es
+-- everything else can't contain side effects, and can be ignored
+-- (probably)
+exp _ = []
+-- annotated groupings of Exp
+exps :: Exps -> [Exp]
+exps (Exp a) = [stripA a]
+exps (Exps as) = stripA `map` stripA as
+-- alternatives in case/receive
+-- fairly sure these are guards with no side effects, and thus
+-- aren't worth exping...
+alt :: Alt -> [Exp]
+alt (Alt _ _ ex) = exps ex
 
 
 
