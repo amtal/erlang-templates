@@ -1,4 +1,4 @@
-#!/usr/local/bin/runghc
+#!/usr/bin/runghc
 --
 -- "X-module function Reference grapher"
 --
@@ -25,8 +25,10 @@
 --
 -- TODO:
 --
+-- remove duplicate module declaration spam
 -- pure ignore list as a runtime option, rather than hardcode
 -- modify ignoring *test.erl via cmd line switch
+-- have option to not delete .core files (debug)
 -- compress multiple call lines into just one, but with a number label
 -- compress multiple calls from same function into one with label?
 --      (this could be interesting for refactoring between files)
@@ -61,7 +63,14 @@ import Data.List hiding (find)
 -- CONFIG: (command line arguments are a sign of weakness)
 -- The point of these graphs is to identify important dependencies.
 -- Leaf modules with no side effects rarely count as such.
-ignoredModules = ["dict","sets","gb_sets","lists"]
+ignoredModules = [ "dict","sets","gb_sets","lists", "proplists",
+                   "string", "io_lib", "re", "eunit",
+                   -- there's plenty of side effects in erlang, but
+                   -- it's also so full of pure funcs it clutters
+                   -- graphs (TODO: have a function list for this,
+                   -- so spawn and whatnot gets watched but not
+                   -- is_atom and whatnot)
+                   "erlang"]
 -- Things like dict and lists are good examples, while erlang and
 -- calendar bad examples due to introducing new processes and the notion
 -- of time.
@@ -79,7 +88,7 @@ main = do
     return ()
         where
     code = extension ==? ".erl"
-        &&? fileName /~? "*test.erl"
+        &&? fileName /~? "*tests.erl"
     core = extension ==? ".core"
 
 erl2core :: FilePath -> IO ()
@@ -122,7 +131,7 @@ extractCrossRefs tree = walkM (stripA tree) where
     -- root of AST
     walkM (Module (Atom name) _ _ funs) = (name,calls) where 
         calls = concatMap walkFD funs
-        walkFD (FunDef _ a) = walk (stripA a)
+    walkFD (FunDef _ a) = walk (stripA a)
     --walk :: Exp -> [a]
     -- Exp forms the bulk of the AST, recursively referring to itself
     -- via Exps (which are just annoted Exp?)
@@ -130,8 +139,9 @@ extractCrossRefs tree = walkM (stripA tree) where
     walk (Lambda _ ex) = walkE ex
     walk (Seq ex ex') = walkE ex ++ walkE ex'
     walk (Let (_,ex) ex') = walkE ex ++ walkE ex'
-    walk (LetRec _ ex) = walkE ex
-    walk (Case ex _) = walkE ex
+    walk (LetRec fs ex) = concatMap walkFD fs ++ walkE ex
+    walk (Case ex as) = walkE ex ++ concatMap (walkAlt . stripA) as
+    walk (Rec as _) = concatMap (walkAlt . stripA) as
     walk (Tuple exs) = concatMap walkE exs
     walk (List l) = walkL l where
         walkL (L es) = concatMap walkE es
@@ -142,7 +152,8 @@ extractCrossRefs tree = walkM (stripA tree) where
     walk (Try es (_, es') (_, es'')) = concatMap walkE (es:es':es'':[])
     walk (Catch es) = walkE es
     -- collect extramodular calls
-    walk (ModCall (m,f) args) = [(get m f (length args))] where
+    walk (ModCall (m,f) args) = concatMap walkE args 
+                             ++ [(get m f (length args))] where
         get (Exp(Constr(Lit(LAtom(Atom m))))) 
             (Exp(Constr(Lit(LAtom(Atom f))))) 
             a = Call Static m f a
@@ -162,7 +173,10 @@ extractCrossRefs tree = walkM (stripA tree) where
     --walkE :: Exps -> [a]
     walkE (Exp a) = walk (stripA a)
     walkE (Exps as) = concatMap (\a->walk .stripA $ a) $ stripA as
-
+    --walkAlt :: Alt -> [a]
+    -- fairly sure guards have no side effects, and thus aren't
+    -- worth walking...
+    walkAlt (Alt _ _ ex) = walkE ex
 
 -- * GraphViz Generation 
 --
