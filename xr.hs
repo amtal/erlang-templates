@@ -99,13 +99,14 @@ erl2core fname = do
 
 exec cmd = runCommand cmd >>= waitForProcess
 
+
+
 -- * Common Data Structures
 
-data Call = Call CallType String String Int
-          | Unimplemented String
-          deriving (Show,Read,Eq)
-data CallType = Static | DynMod | DynFun | DynAll 
-              deriving (Show,Read,Eq)
+data Call = Call (Type,String) (Type,String) Int deriving (Show,Read,Eq)
+data Type = Static | Dynamic deriving (Show,Read,Eq)
+
+
 
 -- * Parsing and Filtering
 
@@ -145,20 +146,9 @@ test = do
 -- collect extramodular calls
 collect :: Exp -> [Call]
 collect e@(ModCall (m,f) args) = collect `cmap` climb e
-                              ++ [get m f (length args)] where
-    get (Exp(Constr(Lit(LAtom(Atom m))))) 
-        (Exp(Constr(Lit(LAtom(Atom f))))) 
-        a = Call Static m f a
-    get (Exp(Constr(Var m)))
-        (Exp(Constr(Lit(LAtom(Atom f))))) 
-        a = Call DynMod m f a
-    get (Exp(Constr(Lit(LAtom(Atom m))))) 
-        (Exp(Constr(Var f)))
-        a = Call DynFun m f a
-    get (Exp(Constr(Var m)))
-        (Exp(Constr(Var f)))
-        a = Call DynAll m f a
-    get foo bar arity = Unimplemented (show (foo,bar,arity))
+              ++ [Call (get m) (get f) (length args)] where
+    get (Exp(Constr(Lit(LAtom(Atom s))))) = (Static, s)
+    get (Exp(Constr(Var s))) = (Dynamic, s)
 collect e = collect `cmap` climb e
 
 funDef :: FunDef -> Exp
@@ -231,8 +221,7 @@ mkGraph ms = concat . intersperse "\n"
                . concat 
                . map (map getTarg . snd) 
                $ ms
-        getTarg (Call _ to _ _) = to
-        getTarg _ = "this edge case should no longer occur"
+        getTarg (Call (_, m) _ _) = m
         bad "-" = False -- I don't understand how this happens
         bad _ = True -- nor care enough to figure it out now
         edge ss shp = concat . map ppMod $ ss where
@@ -241,15 +230,12 @@ mkGraph ms = concat . intersperse "\n"
     calls :: [String]
     calls = concat . map ppModCalls $ ms 
     ppModCalls (mName,mCalls) = map ppCall mCalls where
-        ppCall (Call DynFun m _f _a)
+        ppCall (Call (t,m) (_,_) _a)
             | m `elem` ignoredModules = comm "ignored call to" m
-            | otherwise = arr mName m++" [arrowhead=dot]"
-        ppCall (Call DynAll m _f _a) = arr mName m++" [arrowhead=dot]"
-        ppCall (Call _ m _f _a)
-            | m `elem` ignoredModules = comm "ignored call to" m
-            | otherwise = arr mName m
-        ppCall (Unimplemented err) = comm "unhandled call" err
+            | otherwise = arr mName m++style t
         arr m m' = esc m++"->"++esc m'
         comm s m = "/* "++s++" "++m++" */"
+        style Dynamic = " [arrowhead=dot]"
+        style Static = ""
     -- utility
     esc s = '\"':s++"\""
