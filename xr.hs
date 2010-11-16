@@ -119,29 +119,23 @@ process fname = do
             putStrLn $ "Error parsing "++fname++": "++show err
             return []
         Right tree -> 
-            
             return [extractCrossRefs tree]
+
+cmap = concatMap -- shorthand, we'll need it
 
 -- recursively exp tree via pattern matching, looking for
 -- ModCalls (todo: generalize this via something like a Functor)
 extractCrossRefs :: Ann Module -> (String,[Call])
-extractCrossRefs tree = mod (stripA tree) where
+extractCrossRefs tree = mod (nna tree) where
     mod (Module (Atom name) _ _ funs) = (name,calls) where 
         calls = collect `cmap` map funDef funs
 
 -- annotations show up everywhere and we don't care
 -- (what are they even for, comments? line #s?)
-stripA :: Ann a -> a
-stripA (Ann m _) = m
-stripA (Constr m) = m
+nna :: Ann a -> a
+nna (Ann m _) = m
+nna (Constr m) = m
 
-cmap = concatMap
-
-test = do
-    f <- readFile "gen_server.core"
-    let (Right m) = parseModule f
-        (Module _ _ _ fs) = stripA m
-    return fs
 
 -- collect extramodular calls
 collect :: Exp -> [Call]
@@ -152,7 +146,7 @@ collect e@(ModCall (m,f) args) = collect `cmap` climb e
 collect e = collect `cmap` climb e
 
 funDef :: FunDef -> Exp
-funDef (FunDef _ a) = stripA a
+funDef (FunDef _ a) = nna a
 
 
 -- Generalized syntax tree climbing
@@ -160,16 +154,16 @@ class Tree a where climb :: a -> [Exp]
 -- Exp forms the bulk of the AST, recursively referring to
 -- itself via Exps (which are just one or more annotated Exp)
 instance Tree Exps where
-    climb (Exp a) = [stripA a]
-    climb (Exps as) = stripA `map` stripA as
+    climb (Exp a) = [nna a]
+    climb (Exps as) = nna `map` nna as
 instance Tree Exp where
     climb (App ex exs) = climb ex ++ cmap climb exs
     climb (Lambda _ ex) = climb ex
     climb (Seq ex ex') = climb ex ++ climb ex'
     climb (Let (_,ex) ex') = climb ex ++ climb ex'
     climb (LetRec fs ex) = map funDef fs ++ climb ex
-    climb (Case ex as) = climb ex ++ cmap (climb . stripA) as
-    climb (Rec as _) = cmap (climb . stripA) as
+    climb (Case ex as) = climb ex ++ cmap (climb . nna) as
+    climb (Rec as _) = cmap (climb . nna) as
     climb (Tuple exs) = cmap climb exs
     climb (List l) = climb l where
     climb (Binary bs) = cmap climb bs where
