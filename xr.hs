@@ -1,5 +1,5 @@
+#!/usr/bin/runghc 
 {-# LANGUAGE FlexibleInstances #-}
--- #!/usr/bin/runghc 
 -- (uncomment to make file executable)
 --
 -- "X-module function Reference grapher"
@@ -27,6 +27,19 @@
 --
 -- TODO:
 --
+-- group modules into subgraph_clusters, according to:
+--      purity (unlinked)
+--      OTP?
+--      known side effects
+--      logging?
+-- this organizes and changes the shape of the graph
+-- should be used to bring *related* modules together, if the relation
+-- isn't apparent in the links (OTP) (might clutter things - color/shape
+-- instead?)
+--
+-- separate types for walking Exp and walking everything else, in order
+--   to type-guarantee that Exp won't be expanded twice (and thus not
+--   pattern matched) on accident
 -- remove duplicate module declaration spam
 -- pure ignore list as a runtime option, rather than hardcode
 -- modify ignoring *test.erl via cmd line switch
@@ -197,20 +210,41 @@ instance Tree (BitString Exps) where
 
 graph :: [(String,[Call])] -> IO ()
 graph ms = do
-    writeFile "xr.dot" (mkGraph ms)
+    writeFile "xr.dot" (showGraph . mkGraph $ ms)
     exec "dot -Tpng xr.dot > xr.png"
     return ()
      
-mkGraph :: [(String,[Call])] -> String
-mkGraph ms = concat . intersperse "\n" 
-           $ ["digraph xr {"]++mods++calls++["\n}"]
-        where
+data Graph = Node String NType
+           | Arrow String String AType
+           | Comment String
+           deriving (Show,Read,Eq,Ord)
+data NType = Internal | External deriving (Show,Read,Eq,Ord)
+data AType = Triangle | Ball | Label String deriving (Show,Read,Eq,Ord)
+
+showGraph :: [Graph]->String
+showGraph g = concat . intersperse "\n" 
+            $ ["digraph xr {"]++map pGraph g++["}"] where
+    pGraph (Node s Internal) = "\t"++esc s++" [shape=ellipse]"
+    pGraph (Node s External) = "\t"++esc s++" [shape=box]"
+    pGraph (Arrow m m' t) = esc m++"->"++esc m'++style t where
+        style Ball = " [arrowhead=dot]"
+        style Triangle = ""
+        style (Label s) = "[label="++esc s++"]"
+    pGraph (Comment s) = "/* "++s++" */"
+    esc s = '\"':s++"\""
+
+
+mkGraph :: [(String,[Call])] -> [Graph]
+mkGraph ms = mods++calls where
     -- set up module styles before drawing calls
-    mods :: [String]
-    mods = edge internal "ellipse" ++ edge external "box"
+    mods :: [Graph]
+    mods = conv internal Internal ++ conv external External
             where
-        internal = map fst ms
-        external = filter (not . flip elem internal) called
+        conv ss shp = map (flip Node shp) ss
+        internal = map head . group . sort -- remove duplicates
+                 $ map fst ms
+        external = map head . group . sort -- remove duplicates
+                 $ filter (not . flip elem internal) called
         called = filter bad 
                . concat 
                . map (map getTarg . snd) 
@@ -218,18 +252,20 @@ mkGraph ms = concat . intersperse "\n"
         getTarg (Call (_, m) _ _) = m
         bad "-" = False -- I don't understand how this happens
         bad _ = True -- nor care enough to figure it out now
-        edge ss shp = concat . map ppMod $ ss where
-            ppMod s = ["\t"++esc s++" [shape="++shp++"]"]
     -- call edges
-    calls :: [String]
-    calls = concat . map ppModCalls $ ms 
-    ppModCalls (mName,mCalls) = map ppCall mCalls where
-        ppCall (Call (t,m) (_,_) _a)
-            | m `elem` ignoredModules = comm "ignored call to" m
-            | otherwise = arr mName m++style t
-        arr m m' = esc m++"->"++esc m'
-        comm s m = "/* "++s++" "++m++" */"
-        style Dynamic = " [arrowhead=dot]"
-        style Static = ""
-    -- utility
-    esc s = '\"':s++"\""
+    calls :: [Graph]
+    calls = duplicatesToComments
+          . concat . map modCalls $ ms 
+    modCalls (mName,mCalls) = map call mCalls where
+        call (Call (t,m) (_,_) _a)
+            | m `elem` ignoredModules = Comment $ "ignored call to "++m
+            | otherwise = Arrow mName m (f t) where
+                f Static = Triangle
+                f Dynamic = Ball
+    -- hideously hacky multiple calls->single line with number processing
+    duplicatesToComments :: [Graph]->[Graph]
+    duplicatesToComments = map f . group . sort where
+        f l@((Arrow s s' _):_) = Arrow s s' a where
+            a | length l==1  = Triangle
+              | otherwise = Label . show . length $ l
+        f other = head other
