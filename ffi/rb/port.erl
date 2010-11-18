@@ -3,11 +3,18 @@
 
 go()->
     Port = open_port({spawn,"ruby port.rb"}, 
-                     [use_stdio,hide,binary,{packet,1}]),
+                     [use_stdio,hide,binary,{line,1000}]),
+    f(Port).
+
+f(Port)->
     Call = bert:encode({square,25}),
-    port_command(Port, [size(Call), Call]),
+    io:format(standard_error, "~p~n",[[{sending,Call},{size,size(Call)}]]),
+    port_command(Port, [Call]),
     receive
-        {Port,{data,<<_Len:8/integer, Q/binary>>}} ->
+        {Port,{data,<<Q>>}} ->
             {reply,N} = bert:decode(Q),
-            io:format("~p~n",[N])
-    end.
+            io:format(standard_error, "~p~n",[N]);
+        Other ->
+            io:format(standard_error, "~p~n",[{other,Other}])
+    end,
+    f(Port).

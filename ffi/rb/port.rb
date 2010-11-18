@@ -1,11 +1,20 @@
 require 'bert'
+require 'fcntl'
+
+#STDIN.binmode
+#STDIN.sync=true
+#$stdin.fcntl(Fcntl::F_SETFL,Fcntl::O_NONBLOCK)
 
 while true
-    len = STDIN.getc.to_i
-    cmd = STDIN.read len
-    #cmd = t[:square, 25]
-    n = BERT.decode(cmd)[1]
+    cmd = STDIN.gets
+    next if cmd==nil
+    STDERR.puts "received #{cmd} #{cmd.length}"
+    cmd = cmd[0...cmd.length-1]
+    msg = BERT.decode(cmd)
+    n = msg[1]
+    STDERR.puts "decoded to #{msg} with #{n}"
+    #cmd = BERT.encode(t[:square, 25])
     resp = BERT.encode(t[:reply, n*n]).to_s
-    STDOUT.putc 5
-    STDOUT.puts resp
+    STDERR.puts "responding with #{resp}"
+    STDOUT.puts resp+"\n"
 end
