@@ -20,3 +20,9 @@ cover the major stuff, gen_fsm, gen_server, gen_event, supervisor, app, etc
 link useful docs from README (OTP, Erlang, tutorials on designing/making OTP supervision trees, and edoc?)
     ensure everything necessary is present
         edoc support, comments, consistency, vsn tag
+
+OTHER STUFF:
+
+extras/ contains miscellaneous code
+ffi/ contains FFI tests/attempts, mostly doesn't work
+examples/ contains interesting reference code
