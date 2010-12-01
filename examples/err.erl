@@ -39,6 +39,10 @@ go() ->
     % new, unrelated {badmatch,UnhandledCaughtE} runtime exception.
     % Along with a whole new stack trace. Nested exceptions are NOT
     % fun to read, use catch very carefully.
+    %
+    % You could use catch safely by re-throwing anything you don't
+    % explicitly match: this is probably what 'try' is syntax sugar
+    % for :)
     , {simu_errors, [catch F() || F<-
     % errors can be simulated via the BIF error/1 or /2, and exits
     % via exit/1
