@@ -131,7 +131,7 @@ data Call = Call Mfa Mfa deriving (Show,Read,Eq)
 
 -- * Parsing and Filtering
 
-process :: FilePath -> IO [[Call]]
+process :: FilePath -> IO [Call]
 process fname = do
     s <- readFile fname
     exec $ "rm "++fname
@@ -140,7 +140,7 @@ process fname = do
             putStrLn $ "Error parsing "++fname++": "++show err
             return []
         Right tree -> 
-            return [extractCrossRefs tree]
+            return $ extractCrossRefs tree
 
 cmap = concatMap -- shorthand, we'll need it
 
@@ -228,36 +228,54 @@ instance Tree (BitString Exps) where
 -- Would this allow better control of graph attributes than raw output?
 
 
-graph :: [[Call]] -> IO ()
+graph :: [Call] -> IO ()
 graph ms = do
-    writeFile "xr.dot" (showGraph . mkGraph $ ms)
+    writeFile "xr.data.js" (showGraph . mkGraph $ ms)
     exec "dot -Tpng xr.dot > xr.png"
     return ()
      
-data Graph = Node String NType
-           | Arrow String String AType
-           | Comment String
+data Graph = Node String Int
+           | Link Int Int Int
            deriving (Show,Read,Eq,Ord)
-data NType = Internal | External deriving (Show,Read,Eq,Ord)
-data AType = Triangle | Ball | Label String deriving (Show,Read,Eq,Ord)
 
 showGraph :: [Graph]->String
-showGraph g = concat . intersperse "\n" 
-            $ ["digraph xr {"]++map pGraph g++["}"] where
-    pGraph (Node s Internal) = "\t"++esc s++" [shape=ellipse]"
-    pGraph (Node s External) = "\t"++esc s++" [shape=box]"
-    pGraph (Arrow m m' t) = esc m++"->"++esc m'++style t where
-        style Ball = " [arrowhead=dot]"
-        style Triangle = ""
-        style (Label s) = "[label="++esc s++"]"
-    pGraph (Comment s) = "/* "++s++" */"
+showGraph g = text where
+    text = "var data = {\nnodes:[\n"++nodes++"\n], links:[\n"++links++"\n]};"
+    ren = concat . intersperse ",\n" . filter (/="")
+    nodes = ren . map pNodes $ g
+    links = ren . map pLinks $ g
+    pNodes (Node name group) = "\t{nodeName:"++esc name
+                            ++ ", group:"++show group++"}"
+    pNodes _ = ""
+    pLinks (Link src dst force) = "\t{source:"++show src
+                               ++ ", target:"++show dst
+                               ++ ", value:"++show force++"}"
+    pLinks _ = ""
     esc s = '\"':s++"\""
 
 
 ppMfa (Mfa m f a) = m++":"++f++"/"++show a
 
-mkGraph :: [[Call]] -> [Graph]
-mkGraph ms = mods++calls where
+mkGraph :: [Call] -> [Graph]
+mkGraph cs = nodes++links where
+    -- index lookup tables
+    intModules = rmDups $ map f cs where f (Call (Mfa m _ _) _) = m
+    extModules = rmDups . filter (`notElem` intModules) 
+               $ map f cs where f (Call _ (Mfa m _ _)) = m
+    modules = intModules ++ extModules
+    -- utility 
+    rmDups = map head . group . sort
+    getMfas (Call a b) = [a,b]
+    -- actual data
+    nodes,links :: [Graph]
+    nodes = map f . cmap getMfas $ cs where 
+        f x@(Mfa m f a) = Node (ppMfa x) (group m) 
+        group m = maybe (length intModules) id (elemIndex m intModules)
+    links = map f cs where f (Call src dst) = Link (mid src) (mid dst) 1
+                           mid (Mfa m _ _) = maybe (-1) id (elemIndex m modules)
+
+
+{-
     -- set up module styles before drawing calls
     mods :: [Graph]
     mods = conv internal Internal ++ conv external External
@@ -289,3 +307,4 @@ mkGraph ms = mods++calls where
             a | length l==1  = Triangle
               | otherwise = Label . show . length $ l
         f other = head other
+-}
