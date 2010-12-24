@@ -76,6 +76,8 @@ import Language.CoreErlang.Syntax
 import Prelude hiding (exp)
 -- GraphViz Generation
 import Data.List hiding (find)
+-- Debugging
+import Debug.Trace
 
 -- CONFIG: (command line arguments are a sign of weakness)
 -- The point of these graphs is to identify important dependencies.
@@ -122,8 +124,7 @@ exec cmd = runCommand cmd >>= waitForProcess
 
 -- * Common Data Structures
 
-data Call = Call (Type,String) (Type,String) Int deriving (Show,Read,Eq)
-data Type = Static | Dynamic deriving (Show,Read,Eq)
+data Call = Call String String Int deriving (Show,Read,Eq)
 
 
 
@@ -160,8 +161,13 @@ nna (Constr m) = m
 collect :: Exp -> [Call]
 collect e@(ModCall (m,f) args) = collect `cmap` climb e
               ++ [Call (get m) (get f) (length args)] where
-    get (Exp(Constr(Lit(LAtom(Atom s))))) = (Static, s)
-    get (Exp(Constr(Var s))) = (Dynamic, s)
+    get (Exp(Constr(Lit(LAtom(Atom s))))) = s
+    get (Exp(Constr(Var s))) = s
+collect e@(App f args) = collect `cmap` climb e
+              ++ [Call "local" (get f) (length args)] where
+    get (Exp(Constr(Fun(Function(Atom s,_))))) = s
+    get (Exp(Constr(Var s))) = s
+    get other = trace (show other) undefined
 collect e = collect `cmap` climb e
 
 funDef :: FunDef -> Exp
@@ -256,7 +262,7 @@ mkGraph ms = mods++calls where
                . concat 
                . map (map getTarg . snd) 
                $ ms
-        getTarg (Call (_, m) _ _) = m
+        getTarg (Call m f a) = m++":"++f++"/"++show a
         bad "-" = False -- I don't understand how this happens
         bad _ = True -- nor care enough to figure it out now
     -- call edges
@@ -264,11 +270,9 @@ mkGraph ms = mods++calls where
     calls = duplicatesToComments
           . concat . map modCalls $ ms 
     modCalls (mName,mCalls) = map call mCalls where
-        call (Call (t,m) (_,_) _a)
+        call (Call m f a)
             | m `elem` ignoredModules = Comment $ "ignored call to "++m
-            | otherwise = Arrow mName m (f t) where
-                f Static = Triangle
-                f Dynamic = Ball
+            | otherwise = Arrow mName (m++":"++f++show a) Triangle where
     -- hideously hacky multiple calls->single line with number processing
     duplicatesToComments :: [Graph]->[Graph]
     duplicatesToComments = map f . group . sort where
