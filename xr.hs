@@ -148,17 +148,23 @@ cmap = concatMap -- shorthand, we'll need it
 -- ModCalls (todo: generalize this via something like a Functor)
 extractCrossRefs :: Ann Module -> [Call]
 extractCrossRefs tree = mod (nna tree) where
-    mod (Module (Atom from_mod) _ _ funs) = calls from_mod funs
+    mod (Module (Atom from_mod) _ _ funs) = 
+        calls from_mod `cmap` zip (map funName funs) (map funDef funs)
+    funName (FunDef ann _) = (\(Function ((Atom s), a)) -> (s,fromIntegral a)) 
+                           $ nna ann
 
-calls from_mod funs = collect `cmap` map funDef funs where
+calls :: String -> ((String,Int),Exp) -> [Call]
+calls from_mod ((from_f,from_a),exps) = collect exps where
     collect :: Exp -> [Call]
     collect e@(ModCall (m,f) args) = collect `cmap` climb e 
-        ++ [Call (Mfa from_mod "idk" 0) (Mfa (get m) (get f) (length args))] 
+        ++ [Call (Mfa from_mod from_f from_a) 
+                 (Mfa (get m) (get f) (length args))] 
             where
         get (Exp(Constr(Lit(LAtom(Atom s))))) = s
         get (Exp(Constr(Var s))) = s
     collect e@(App f args) = collect `cmap` climb e
-        ++ [Call (Mfa from_mod "idk" 0) (Mfa from_mod (get f) (length args))] 
+        ++ [Call (Mfa from_mod from_f from_a) 
+                 (Mfa from_mod (get f) (length args))] 
             where
         get (Exp(Constr(Fun(Function(Atom s,_))))) = s
         get (Exp(Constr(Var s))) = s
