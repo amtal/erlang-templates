@@ -1,0 +1,74 @@
+<html>
+  <head>
+    <title>Force-Directed Layout</title>
+    <script type="text/javascript" src="protovis-r3.2.js"></script>
+    <script type="text/javascript" src="xr.data.js"></script>
+    <style type="text/css">
+
+body {
+  margin: 0;
+}
+
+    </style>
+  </head>
+  <p onClick="delete_links=~delete_links">link-delete-mode</p>
+  <body>
+    <script type="text/javascript+protovis">
+
+delete_links = false;
+
+var w = document.body.clientWidth,
+    h = document.body.clientHeight,
+    colors = pv.Colors.category19();
+
+var vis = new pv.Panel()
+    .width(w)
+    .height(h)
+    .fillStyle("white")
+    .event("mousedown", pv.Behavior.pan())
+    .event("mousewheel", pv.Behavior.zoom(1))
+    .event("mousemove", pv.Behavior.point());
+
+var force = vis.add(pv.Layout.Force)
+    .nodes(data.nodes)
+    .links(data.links);
+
+force.link.add(pv.Line)
+
+force.node.add(pv.Dot)
+    .def("active",-1)
+    .size(function(d) (d.linkDegree + 4) * Math.pow(this.scale, -1.5))
+    .fillStyle(function(d) d.fix ? "brown" : colors(d.group))
+    .strokeStyle(function() this.fillStyle().darker())
+    .lineWidth(1)
+    .title(function(d) d.nodeName)
+    .event("mousedown", pv.Behavior.drag())
+    .event("drag", force)
+    /*.event("click", function(d) {
+        //if (delete_links) {d.nodeName=d.index}
+        d.nodeName=force.links()[d.index].source
+        //delete force.links()[d.index]
+        for (k in force.links()) {
+            if (force.links()[k].target==d.index) {
+                delete miserables.links[k]
+                force.links(miserables.links)
+                d.nodeName=k
+            }
+        }
+        //Array().filter( function (k) {k.target==d.index}, force.links)
+        //vis.render();
+    })*/
+    .event("point", function() this.active(this.index).parent)
+    .event("unpoint", function() this.active(-1).parent)
+    .anchor("right").add(pv.Label)
+        .visible(function() this.anchorTarget().active()==this.index)
+        .text(function(d) d.nodeName);
+
+vis.render();
+
+
+    </script>
+  </body>
+</html>
+
+
