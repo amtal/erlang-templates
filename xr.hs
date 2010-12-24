@@ -124,13 +124,14 @@ exec cmd = runCommand cmd >>= waitForProcess
 
 -- * Common Data Structures
 
-data Call = Call String String Int deriving (Show,Read,Eq)
+data Mfa = Mfa String String Int deriving (Show,Read,Eq)
+data Call = Call Mfa Mfa deriving (Show,Read,Eq)
 
 
 
 -- * Parsing and Filtering
 
-process :: FilePath -> IO [(String, [Call])]
+process :: FilePath -> IO [[Call]]
 process fname = do
     s <- readFile fname
     exec $ "rm "++fname
@@ -145,10 +146,24 @@ cmap = concatMap -- shorthand, we'll need it
 
 -- recursively exp tree via pattern matching, looking for
 -- ModCalls (todo: generalize this via something like a Functor)
-extractCrossRefs :: Ann Module -> (String,[Call])
+extractCrossRefs :: Ann Module -> [Call]
 extractCrossRefs tree = mod (nna tree) where
-    mod (Module (Atom name) _ _ funs) = (name,calls) where 
-        calls = collect `cmap` map funDef funs
+    mod (Module (Atom from_mod) _ _ funs) = calls from_mod funs
+
+calls from_mod funs = collect `cmap` map funDef funs where
+    collect :: Exp -> [Call]
+    collect e@(ModCall (m,f) args) = collect `cmap` climb e 
+        ++ [Call (Mfa from_mod "idk" 0) (Mfa (get m) (get f) (length args))] 
+            where
+        get (Exp(Constr(Lit(LAtom(Atom s))))) = s
+        get (Exp(Constr(Var s))) = s
+    collect e@(App f args) = collect `cmap` climb e
+        ++ [Call (Mfa from_mod "idk" 0) (Mfa from_mod (get f) (length args))] 
+            where
+        get (Exp(Constr(Fun(Function(Atom s,_))))) = s
+        get (Exp(Constr(Var s))) = s
+        get other = trace (show other) undefined
+    collect e = collect `cmap` climb e
 
 -- annotations show up everywhere and we don't care
 -- (what are they even for, comments? line #s?)
@@ -156,22 +171,9 @@ nna :: Ann a -> a
 nna (Ann m _) = m
 nna (Constr m) = m
 
-
--- collect extramodular calls
-collect :: Exp -> [Call]
-collect e@(ModCall (m,f) args) = collect `cmap` climb e
-              ++ [Call (get m) (get f) (length args)] where
-    get (Exp(Constr(Lit(LAtom(Atom s))))) = s
-    get (Exp(Constr(Var s))) = s
-collect e@(App f args) = collect `cmap` climb e
-              ++ [Call "local" (get f) (length args)] where
-    get (Exp(Constr(Fun(Function(Atom s,_))))) = s
-    get (Exp(Constr(Var s))) = s
-    get other = trace (show other) undefined
-collect e = collect `cmap` climb e
-
 funDef :: FunDef -> Exp
 funDef (FunDef _ a) = nna a
+
 
 
 -- Generalized syntax tree climbing
@@ -220,7 +222,7 @@ instance Tree (BitString Exps) where
 -- Would this allow better control of graph attributes than raw output?
 
 
-graph :: [(String,[Call])] -> IO ()
+graph :: [[Call]] -> IO ()
 graph ms = do
     writeFile "xr.dot" (showGraph . mkGraph $ ms)
     exec "dot -Tpng xr.dot > xr.png"
@@ -246,8 +248,9 @@ showGraph g = concat . intersperse "\n"
     esc s = '\"':s++"\""
 
 
+ppMfa (Mfa m f a) = m++":"++f++"/"++show a
 
-mkGraph :: [(String,[Call])] -> [Graph]
+mkGraph :: [[Call]] -> [Graph]
 mkGraph ms = mods++calls where
     -- set up module styles before drawing calls
     mods :: [Graph]
@@ -255,24 +258,24 @@ mkGraph ms = mods++calls where
             where
         conv ss shp = map (flip Node shp) ss
         internal = map head . group . sort -- remove duplicates
-                 $ map fst ms
+                 . concat $ (map.map) (\(Call from _)->ppMfa from) ms
         external = map head . group . sort -- remove duplicates
                  $ filter (not . flip elem internal) called
         called = filter bad 
                . concat 
-               . map (map getTarg . snd) 
+               . map (map getTarg) 
                $ ms
-        getTarg (Call m f a) = m++":"++f++"/"++show a
+        getTarg (Call _ t) = ppMfa t
         bad "-" = False -- I don't understand how this happens
         bad _ = True -- nor care enough to figure it out now
     -- call edges
     calls :: [Graph]
     calls = duplicatesToComments
           . concat . map modCalls $ ms 
-    modCalls (mName,mCalls) = map call mCalls where
-        call (Call m f a)
+    modCalls mCalls = map call mCalls where
+        call (Call from to@(Mfa m _ _))
             | m `elem` ignoredModules = Comment $ "ignored call to "++m
-            | otherwise = Arrow mName (m++":"++f++show a) Triangle where
+            | otherwise = Arrow (ppMfa from) (ppMfa to) Triangle where
     -- hideously hacky multiple calls->single line with number processing
     duplicatesToComments :: [Graph]->[Graph]
     duplicatesToComments = map f . group . sort where
