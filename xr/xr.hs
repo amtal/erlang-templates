@@ -1,4 +1,3 @@
-#!/usr/local/bin/runghc
 {-# LANGUAGE FlexibleInstances #-}
 -- (uncomment to make file executable)
 --
