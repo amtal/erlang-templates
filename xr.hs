@@ -1,4 +1,3 @@
-#!/usr/bin/runghc 
 {-# LANGUAGE FlexibleInstances #-}
 -- (uncomment to make file executable)
 --
@@ -27,6 +26,10 @@
 --
 -- TODO:
 --
+-- separate types for walking Exp and walking everything else, in order
+--   to type-guarantee that Exp won't be expanded twice (and thus not
+--   pattern matched) on accident
+--
 -- group modules into subgraph_clusters, according to:
 --      purity (unlinked)
 --      OTP?
@@ -37,14 +40,14 @@
 -- isn't apparent in the links (OTP) (might clutter things - color/shape
 -- instead?)
 --
--- separate types for walking Exp and walking everything else, in order
---   to type-guarantee that Exp won't be expanded twice (and thus not
---   pattern matched) on accident
--- remove duplicate module declaration spam
+-- or just use type annotations to group them (a -package mod tag?)
+-- definitely add a -pure mod tag, annotating either funcs or entire module
+-- (pure modules can be hidden from mod. dep graph, not interesting)
+--
+--
 -- pure ignore list as a runtime option, rather than hardcode
 -- modify ignoring *test.erl via cmd line switch
 -- have option to not delete .core files (debug)
--- compress multiple call lines into just one, but with a number label
 -- 
 -- something to avoid constant recompile cost...
 -- graph colouring to trace flow through multiple modules?
@@ -79,6 +82,9 @@ import Data.List hiding (find)
 -- Leaf modules with no side effects rarely count as such.
 ignoredModules = [ "dict","sets","gb_sets","lists", "proplists",
                    "string", "io_lib", "re", "eunit",
+                   -- these aren't pure, but used everywhere so I've
+                   -- got no choice but to ignore them
+                   "gen_server", "gen_event",
                    -- there's plenty of side effects in erlang, but
                    -- it's also so full of pure funcs it clutters
                    -- graphs (TODO: have a function list for this,
@@ -107,7 +113,7 @@ main = do
 
 erl2core :: FilePath -> IO ()
 erl2core fname = do
-    ret <- exec $ "erlc +to_core "++fname
+    ret <- exec $ "erlc -I ../include +to_core "++fname
     when (ret/=ExitSuccess) (putStrLn $ "\tError compiling "++fname)
 
 exec cmd = runCommand cmd >>= waitForProcess
@@ -232,6 +238,7 @@ showGraph g = concat . intersperse "\n"
         style (Label s) = "[label="++esc s++"]"
     pGraph (Comment s) = "/* "++s++" */"
     esc s = '\"':s++"\""
+
 
 
 mkGraph :: [(String,[Call])] -> [Graph]
