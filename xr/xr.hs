@@ -1,3 +1,4 @@
+#!/usr/local/bin/runghc
 {-# LANGUAGE FlexibleInstances #-}
 -- (uncomment to make file executable)
 --
@@ -115,7 +116,7 @@ main = do
 
 erl2core :: FilePath -> IO ()
 erl2core fname = do
-    ret <- exec $ "erlc -I ../include +to_core "++fname
+    ret <- exec $ "erlc -I ../deps -I ../include +to_core "++fname
     when (ret/=ExitSuccess) (putStrLn $ "\tError compiling "++fname)
 
 exec cmd = runCommand cmd >>= waitForProcess
@@ -124,8 +125,8 @@ exec cmd = runCommand cmd >>= waitForProcess
 
 -- * Common Data Structures
 
-data Mfa = Mfa String String Int deriving (Show,Read,Eq)
-data Call = Call Mfa Mfa deriving (Show,Read,Eq)
+data Mfa = Mfa String String Int deriving (Show,Read,Eq,Ord)
+data Call = Call Mfa Mfa deriving (Show,Read,Eq,Ord)
 
 
 
@@ -231,7 +232,6 @@ instance Tree (BitString Exps) where
 graph :: [Call] -> IO ()
 graph ms = do
     writeFile "xr.data.js" (showGraph . mkGraph $ ms)
-    exec "dot -Tpng xr.dot > xr.png"
     return ()
      
 data Graph = Node String Int
@@ -259,52 +259,21 @@ ppMfa (Mfa m f a) = m++":"++f++"/"++show a
 mkGraph :: [Call] -> [Graph]
 mkGraph cs = nodes++links where
     -- index lookup tables
-    intModules = rmDups $ map f cs where f (Call (Mfa m _ _) _) = m
-    extModules = rmDups . filter (`notElem` intModules) 
-               $ map f cs where f (Call _ (Mfa m _ _)) = m
-    modules = intModules ++ extModules
+    iMods = map (\(Call (Mfa m _ _) _)->m) $ cs where 
+    funs =  rmDups . cmap getMfas . filter notIgnored $ cs
     -- utility 
+    rmDups :: Ord a => [a] -> [a]
     rmDups = map head . group . sort
     getMfas (Call a b) = [a,b]
+    notIgnored (Call _ (Mfa m _ _)) = m `notElem` ignoredModules
     -- actual data
     nodes,links :: [Graph]
-    nodes = map f . cmap getMfas $ cs where 
+    nodes = map f $ funs where 
         f x@(Mfa m f a) = Node (ppMfa x) (group m) 
-        group m = maybe (length intModules) id (elemIndex m intModules)
-    links = map f cs where f (Call src dst) = Link (mid src) (mid dst) 1
-                           mid (Mfa m _ _) = maybe (-1) id (elemIndex m modules)
-
-
-{-
-    -- set up module styles before drawing calls
-    mods :: [Graph]
-    mods = conv internal Internal ++ conv external External
-            where
-        conv ss shp = map (flip Node shp) ss
-        internal = map head . group . sort -- remove duplicates
-                 . concat $ (map.map) (\(Call from _)->ppMfa from) ms
-        external = map head . group . sort -- remove duplicates
-                 $ filter (not . flip elem internal) called
-        called = filter bad 
-               . concat 
-               . map (map getTarg) 
-               $ ms
-        getTarg (Call _ t) = ppMfa t
-        bad "-" = False -- I don't understand how this happens
-        bad _ = True -- nor care enough to figure it out now
-    -- call edges
-    calls :: [Graph]
-    calls = duplicatesToComments
-          . concat . map modCalls $ ms 
-    modCalls mCalls = map call mCalls where
-        call (Call from to@(Mfa m _ _))
-            | m `elem` ignoredModules = Comment $ "ignored call to "++m
-            | otherwise = Arrow (ppMfa from) (ppMfa to) Triangle where
-    -- hideously hacky multiple calls->single line with number processing
-    duplicatesToComments :: [Graph]->[Graph]
-    duplicatesToComments = map f . group . sort where
-        f l@((Arrow s s' _):_) = Arrow s s' a where
-            a | length l==1  = Triangle
-              | otherwise = Label . show . length $ l
-        f other = head other
--}
+        group m = maybe (length iMods) id (elemIndex m iMods)
+    links = map collapse . group . sort . map f 
+          . filter notIgnored $ cs where 
+        f (Call src dst) = Link (mid src) (mid dst) 1
+        mid mfa = maybe (-1) id (elemIndex mfa funs)
+        collapse (link:[]) = link
+        collapse l@(Link s d f:_) = Link s d (length l)
