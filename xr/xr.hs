@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
--- (uncomment to make file executable)
+-- #!/usr/bin/runghc
+-- (uncomment and place at the top to make file executable)
 --
 -- "X-module function Reference grapher"
 --
@@ -7,11 +8,9 @@
 -- A simple but powerful tool for static analysis of source code.
 --
 -- FEATURES:
---  - unknown modules shown as boxes, known as ellipses
---  - there's an ignore list for "pure" modules with no interesting side
---    effects
---  - by using core erlang precompilation, eunit/debug code is properly
---    taken into account (I think!)
+--  - shows function and module dependencies together
+--  - eunit/debug code is properly taken into account
+--  - you can interact with the produced graph
 --
 -- DEPENDENCIES:
 --  - GHC, a recent Haskell Platform should do. You'll need
@@ -19,10 +18,12 @@
 --      amtal@kos:~$ cabal update
 --      amtal@kos:~$ cabal install filemanip
 --      amtal@kos:~$ cabal install coreerlang
---  - GraphViz, see your package manager of choice
 --  - Won't clean up after itself on Windows due to using `rm`
 --
 -- CAUTION: hacky work in progress: lists, strings, IO everywhere
+--
+-- KNOWN BUGS:
+--  - the CoreErlang parser fails to parse floats
 --
 -- TODO:
 --
@@ -115,7 +116,8 @@ main = do
 
 erl2core :: FilePath -> IO ()
 erl2core fname = do
-    ret <- exec $ "erlc -I ../deps -I ../include +to_core "++fname
+    ret <- exec $ "erlc -I ../deps -I ../include -I ../.."
+               ++" +to_core "++fname
     when (ret/=ExitSuccess) (putStrLn $ "\tError compiling "++fname)
 
 exec cmd = runCommand cmd >>= waitForProcess
@@ -124,9 +126,8 @@ exec cmd = runCommand cmd >>= waitForProcess
 
 -- * Common Data Structures
 
-data Mfa = Mfa String String Int deriving (Show,Read,Eq,Ord)
 data Call = Call Mfa Mfa deriving (Show,Read,Eq,Ord)
-
+data Mfa = Mfa String String Int deriving (Show,Read,Eq,Ord)
 
 
 -- * Parsing and Filtering
@@ -222,12 +223,9 @@ instance Tree (BitString Exps) where
 
 -- * GraphViz Generation 
 --
--- Note: combining Data.Graph.Inductive and Data.GraphViz may produce
--- cromulent results. Then again, it might just be a waste of time.
--- 
--- Would this allow better control of graph attributes than raw output?
-
-
+-- Note: Data.Graph.Inductive could be useful for doing things like finding
+-- leaf/root nodes and identifying them as thus. There's currently no sense
+-- of direction in the graphs.
 graph :: [Call] -> IO ()
 graph ms = do
     writeFile "xr.data.js" (showGraph . mkGraph $ ms)
